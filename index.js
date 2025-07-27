@@ -1,22 +1,26 @@
 const express = require('express');
 const cors = require('cors');
 const { chromium } = require('playwright');
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
 app.post('/scrape', async (req, res) => {
   const targetUrl = req.body.url || 'https://addisbiz.com/business-directory/construction/contractors-general?city=Addis%20Ababa&page=3';
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: false }); // Use headless: true in production
   const page = await browser.newPage();
+  page.setDefaultTimeout(60000); // Set default timeout to 60 seconds
 
   try {
     console.log('🔄 Navigating to the listing page...');
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.waitForLoadState('networkidle');
 
-    await page.waitForSelector('a.address');
+    // Wait for the selector longer, in case it loads slowly
+    await page.waitForSelector('a.address', { timeout: 60000 });
+
     const links = await page.$$eval('a.address', (elements) =>
       elements.map((el) => el.href)
     );
@@ -71,15 +75,19 @@ app.post('/scrape', async (req, res) => {
     console.log(`\n🎯 Finished scraping. Found ${results.length} companies with mobile numbers.`);
     await browser.close();
 
-    res.json(results);
+    return res.json(results);
   } catch (error) {
+    console.error('❌ Scraping failed:', error);
+    await page.screenshot({ path: 'error.png' }); // Optional: save screenshot for debugging
     await browser.close();
-    console.error(error);
-    res.status(500).json({ error: 'Scraping failed', details: error.message });
+    return res.status(500).json({
+      error: 'Scraping failed',
+      details: error.message,
+    });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
