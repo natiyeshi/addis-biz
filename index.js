@@ -9,19 +9,21 @@ app.use(express.json());
 app.post('/scrape', async (req, res) => {
   const targetUrl = req.body.url || 'https://addisbiz.com/business-directory/construction/contractors-general?city=Addis%20Ababa&page=3';
 
-  const browser = await chromium.launch({ headless: false }); // Use headless: true in production
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
-  page.setDefaultTimeout(60000); // Set default timeout to 60 seconds
+
+  // Remove all timeouts
+  page.setDefaultTimeout(0); // ⬅️ No timeout globally
+  page.setDefaultNavigationTimeout(0); // ⬅️ Also remove navigation timeout
 
   try {
     console.log('🔄 Navigating to the listing page...');
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(targetUrl, { waitUntil: 'networkidle' });
     await page.waitForLoadState('networkidle');
+    console.info("____++___++_______")
+    await page.waitForSelector('a.name'); // no timeout here
 
-    // Wait for the selector longer, in case it loads slowly
-    await page.waitForSelector('a.address', { timeout: 60000 });
-
-    const links = await page.$$eval('a.address', (elements) =>
+    const links = await page.$$eval('a.name', (elements) =>
       elements.map((el) => el.href)
     );
 
@@ -34,15 +36,16 @@ app.post('/scrape', async (req, res) => {
 
       try {
         const detailPage = await browser.newPage();
-        await detailPage.goto(link, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        detailPage.setDefaultTimeout(0);
+        detailPage.setDefaultNavigationTimeout(0);
 
-        await detailPage.waitForSelector('table.businessdetails', { timeout: 10000 });
+        await detailPage.goto(link, { waitUntil: 'domcontentloaded' });
+        await detailPage.waitForSelector('table.businessdetails');
 
         const mobile = await detailPage.$$eval('table.businessdetails tr', (rows) => {
           for (const row of rows) {
             const label = row.querySelector('td')?.innerText.trim();
             const value = row.querySelectorAll('td')[1]?.innerText.trim();
-
             if (label && label.toLowerCase().includes('mobile') && value) {
               return value;
             }
@@ -78,7 +81,7 @@ app.post('/scrape', async (req, res) => {
     return res.json(results);
   } catch (error) {
     console.error('❌ Scraping failed:', error);
-    await page.screenshot({ path: 'error.png' }); // Optional: save screenshot for debugging
+    await page.screenshot({ path: 'error.png' });
     await browser.close();
     return res.status(500).json({
       error: 'Scraping failed',
@@ -86,6 +89,7 @@ app.post('/scrape', async (req, res) => {
     });
   }
 });
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
