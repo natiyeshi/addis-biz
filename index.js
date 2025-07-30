@@ -5,6 +5,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
 app.post('/scrape', async (req, res) => {
   const targetUrl = req.body.url || 'https://addisbiz.com/business-directory/construction/contractors-general?city=Addis%20Ababa&page=4';
@@ -91,7 +92,6 @@ app.post('/scrape', async (req, res) => {
 });
 
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
