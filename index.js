@@ -7,8 +7,8 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/scrape', async (req, res) => {
-  const targetUrl = req.body.url || 'https://addisbiz.com/business-directory/construction/contractors-general?city=Addis%20Ababa&page=3';
-
+  const targetUrl = req.body.url || 'https://addisbiz.com/business-directory/construction/contractors-general?city=Addis%20Ababa&page=4';
+  console.log("request start : ")
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
